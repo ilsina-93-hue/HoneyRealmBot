@@ -1,71 +1,50 @@
-﻿import telebot
+import telebot
 import json
 import random
 import os
 
-TOKEN = "8969226485:AAHljM-FRo6Cl4d595s3hqjFC-fSrBbmBn4"
+TOKEN = "ТВОЙ_ТОКЕН_БОТА"
 
 bot = telebot.TeleBot(TOKEN)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-JSON_FILE = os.path.join(BASE_DIR, "characters.json")
-IMAGES_DIR = os.path.join(BASE_DIR, "images")
+# Загружаем персонажей (работает с BOM и без BOM)
+with open("characters.json", "r", encoding="utf-8-sig") as file:
+    characters = json.load(file)
 
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    text = (
-        "🍯 Добро пожаловать в Медовое Царство!\n\n"
-        "Нажми кнопку ниже и узнай, кем из жителей ты бы стал."
-    )
-
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🍯 Узнать, кто я")
+    button = telebot.types.KeyboardButton("🍯 Узнать, кто я")
+    markup.add(button)
 
     bot.send_message(
         message.chat.id,
-        text,
+        "Добро пожаловать в HoneyRealm 🍯\nНажми кнопку и узнай своего персонажа!",
         reply_markup=markup
     )
 
 
-@bot.message_handler(func=lambda m: m.text == "🍯 Узнать, кто я")
-def who(message):
-    try:
-        with open(JSON_FILE, "r", encoding="utf-8-sig") as f:
-            characters = json.load(f)
+@bot.message_handler(func=lambda message: message.text == "🍯 Узнать, кто я")
+def get_character(message):
+    character = random.choice(characters)
 
-        if not characters:
-            bot.send_message(
-                message.chat.id,
-                "🍯 Медовое Царство пока заселяется..."
-            )
-            return
+    image_name = character["image"]
 
-        character = random.choice(characters)
+    # Картинки лежат рядом с bot.py
+    image_path = os.path.join(os.getcwd(), image_name)
 
-        photo_path = os.path.join(
-            IMAGES_DIR,
-            character["image"]
-        )
-
-        caption = (
-            f"🍯 <b>Ты - {character['name']}!</b>\n\n"
-            f"<i>{character['description']}</i>"
-        )
-
-        with open(photo_path, "rb") as photo:
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as photo:
             bot.send_photo(
                 message.chat.id,
                 photo,
-                caption=caption,
-                parse_mode="HTML"
+                caption=f"🍯 {character['name']}\n\n{character['description']}"
             )
-
-    except Exception as e:
+    else:
         bot.send_message(
             message.chat.id,
-            f"Ошибка:\n{e}"
+            f"Ошибка: не найдена картинка {image_name}"
         )
 
 
