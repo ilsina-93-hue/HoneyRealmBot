@@ -7,12 +7,13 @@ TOKEN = "8969226485:AAF5agI6z1HHj1pHN4Usj-Q30joFRiHbcQM"
 
 bot = telebot.TeleBot(TOKEN)
 
+
 # Загружаем персонажей
 with open("characters.json", "r", encoding="utf-8-sig") as file:
     characters = json.load(file)
 
 
-# Команда старт
+# Команда /start
 @bot.message_handler(commands=["start"])
 def start(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -26,7 +27,7 @@ def start(message):
     )
 
 
-# Кнопка в личке
+# Получение персонажа через кнопку
 @bot.message_handler(func=lambda message: message.text == "🍯 Узнать, кто я")
 def get_character(message):
     character = random.choice(characters)
@@ -54,30 +55,36 @@ def get_character(message):
         )
 
 
-# Inline режим через @HoneyRealmBot
+# Inline режим @HoneyRealmBot для групп
 @bot.inline_handler(func=lambda query: True)
 def inline_character(query):
     character = random.choice(characters)
 
-    text = (
+    image_name = character["image"]
+
+    # Картинка из GitHub
+    image_url = (
+        f"https://raw.githubusercontent.com/"
+        f"ilsina-93-hue/HoneyRealmBot/main/{image_name}"
+    )
+
+    caption = (
         f"🍯 <b>{character['name']}</b>\n\n"
         f"<i>{character['description']}</i>"
     )
 
-    result = telebot.types.InlineQueryResultArticle(
-        id=str(random.randint(1, 999999)),
-        title=character["name"],
-        description=character["description"],
-        input_message_content=telebot.types.InputTextMessageContent(
-            text,
-            parse_mode="HTML"
-        )
+    result = telebot.types.InlineQueryResultPhoto(
+        id=str(random.randint(1, 999999999)),
+        photo_url=image_url,
+        thumbnail_url=image_url,
+        caption=caption,
+        parse_mode="HTML"
     )
 
     bot.answer_inline_query(
         query.id,
         [result],
-        cache_time=1
+        cache_time=0
     )
 
 
