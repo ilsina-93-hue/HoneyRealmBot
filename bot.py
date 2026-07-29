@@ -23,6 +23,7 @@ def home():
     return "HoneyRealmBot is running!"
 
 
+
 # ==========================
 # Загружаем персонажей
 # ==========================
@@ -31,8 +32,9 @@ with open("characters.json", "r", encoding="utf-8-sig") as file:
     characters = json.load(file)
 
 
+
 # ==========================
-# Отправка персонажа
+# Выдача персонажа
 # ==========================
 
 def send_character(chat_id):
@@ -54,8 +56,7 @@ def send_character(chat_id):
 
 
     print(
-        f"[INFO] Выбран персонаж: {character['name']} "
-        f"для {chat_id}"
+        f"[INFO] Выбран персонаж: {character['name']}"
     )
 
 
@@ -73,8 +74,6 @@ def send_character(chat_id):
         return
 
 
-
-    # 2 попытки отправки
 
     for attempt in range(2):
 
@@ -97,10 +96,11 @@ def send_character(chat_id):
 
 
             print(
-                "[OK] Фото отправлено успешно"
+                "[OK] Фото отправлено"
             )
 
             return
+
 
 
         except Exception as e:
@@ -112,20 +112,23 @@ def send_character(chat_id):
 
             if attempt == 0:
 
-                print(
-                    "[INFO] Повтор через 2 секунды"
-                )
-
                 time.sleep(2)
 
 
 
-    # если обе попытки провалились
+    try:
 
-    bot.send_message(
-        chat_id,
-        "⚠️ Не удалось отправить персонажа. Попробуйте еще раз."
-    )
+        bot.send_message(
+            chat_id,
+            "⚠️ Не удалось отправить персонажа. Попробуйте еще раз."
+        )
+
+    except Exception as e:
+
+        print(
+            f"[ERROR] Не удалось отправить сообщение: {e}"
+        )
+
 
 
 
@@ -157,6 +160,7 @@ def start(message):
 
 
 
+
 # ==========================
 # Кнопка
 # ==========================
@@ -173,8 +177,9 @@ def button_character(message):
 
 
 
+
 # ==========================
-# Группы
+# Команда для групп
 # ==========================
 
 @bot.message_handler(
@@ -188,15 +193,15 @@ def honey(message):
 
 
 
+
 # ==========================
-# Inline
+# Inline-проводник
 # ==========================
 
 @bot.inline_handler(
     func=lambda query: True
 )
 def inline_help(query):
-
 
     result = telebot.types.InlineQueryResultArticle(
 
@@ -214,7 +219,7 @@ def inline_help(query):
             "Чтобы узнать своего персонажа:\n\n"
             "• В личном чате нажмите кнопку "
             "«🍯 Узнать, кто я»\n"
-            "• В группе используйте:\n"
+            "• В группе используйте команду:\n"
             "/honey"
 
         )
@@ -223,16 +228,12 @@ def inline_help(query):
 
 
     bot.answer_inline_query(
-
         query.id,
-
         [result],
-
         cache_time=0,
-
         is_personal=True
-
     )
+
 
 
 
@@ -251,12 +252,10 @@ def run_flask():
 
 
     app.run(
-
         host="0.0.0.0",
-
         port=port
-
     )
+
 
 
 
@@ -267,17 +266,36 @@ print(
 
 
 threading.Thread(
-
     target=run_flask,
-
     daemon=True
-
 ).start()
 
 
 
-bot.infinity_polling(
+# ==========================
+# Polling с защитой
+# ==========================
 
-    skip_pending=True
+while True:
 
-)
+    try:
+
+        print(
+            "Запуск polling..."
+        )
+
+
+        bot.infinity_polling(
+            skip_pending=True,
+            timeout=30,
+            long_polling_timeout=30
+        )
+
+
+    except Exception as e:
+
+        print(
+            f"Polling ошибка: {e}"
+        )
+
+        time.sleep(10)
