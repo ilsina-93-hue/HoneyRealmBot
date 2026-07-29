@@ -2,10 +2,19 @@ import telebot
 import json
 import random
 import os
+import threading
+from flask import Flask
 
-TOKEN = "8969226485:AAF5agI6z1HHj1pHN4Usj-Q30joFRiHbcQM"
+TOKEN = "ТВОЙ_НОВЫЙ_ТОКЕН"
 
 bot = telebot.TeleBot(TOKEN)
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+    return "HoneyRealmBot is running!"
 
 
 # Загружаем персонажей
@@ -13,7 +22,6 @@ with open("characters.json", "r", encoding="utf-8-sig") as file:
     characters = json.load(file)
 
 
-# Команда /start
 @bot.message_handler(commands=["start"])
 def start(message):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -27,7 +35,6 @@ def start(message):
     )
 
 
-# Получение персонажа через кнопку
 @bot.message_handler(func=lambda message: message.text == "🍯 Узнать, кто я")
 def get_character(message):
     character = random.choice(characters)
@@ -48,21 +55,14 @@ def get_character(message):
                 caption=caption,
                 parse_mode="HTML"
             )
-    else:
-        bot.send_message(
-            message.chat.id,
-            f"Ошибка: не найдена картинка {image_name}"
-        )
 
 
-# Inline режим @HoneyRealmBot для групп
 @bot.inline_handler(func=lambda query: True)
 def inline_character(query):
     character = random.choice(characters)
 
     image_name = character["image"]
 
-    # Картинка из GitHub
     image_url = (
         f"https://raw.githubusercontent.com/"
         f"ilsina-93-hue/HoneyRealmBot/main/{image_name}"
@@ -74,7 +74,7 @@ def inline_character(query):
     )
 
     result = telebot.types.InlineQueryResultPhoto(
-        id=str(random.randint(1, 999999999)),
+        id=str(random.randint(100000, 999999999)),
         photo_url=image_url,
         thumbnail_url=image_url,
         caption=caption,
@@ -84,10 +84,17 @@ def inline_character(query):
     bot.answer_inline_query(
         query.id,
         [result],
-        cache_time=0
+        cache_time=0,
+        is_personal=True
     )
 
 
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
+
+
 print("HoneyRealmBot запущен!")
+
+threading.Thread(target=run_flask).start()
 
 bot.infinity_polling(skip_pending=True)
