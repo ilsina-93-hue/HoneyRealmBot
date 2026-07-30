@@ -10,25 +10,12 @@ import telebot
 from flask import Flask
 
 
-# ==========================
-# TOKEN
-# ==========================
-
-TOKEN = "8969226485:AAHAlONzMrgtquxWIUtkq3dlFsC1t3dPSec"
+TOKEN = "8969226485:AAFL-Vwi58aU0PlPyvkgpgHGKhBXGj4aDA8"
 
 bot = telebot.TeleBot(TOKEN)
 
-
-# ==========================
-# Flask
-# ==========================
-
 app = Flask(__name__)
 
-
-# ==========================
-# Логи
-# ==========================
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,18 +23,11 @@ logging.basicConfig(
 )
 
 
-# ==========================
-# Файлы
-# ==========================
-
 CHARACTERS_FILE = "characters.json"
 USERS_FILE = "users.json"
 BACKUP_FILE = "users_backup.json"
 
 
-# ==========================
-# Flask
-# ==========================
 
 @app.route("/")
 def home():
@@ -55,12 +35,7 @@ def home():
 
 
 
-# ==========================
-# Персонажи
-# ==========================
-
 try:
-
     with open(
         CHARACTERS_FILE,
         "r",
@@ -68,7 +43,6 @@ try:
     ) as file:
 
         characters = json.load(file)
-
 
 except Exception as e:
 
@@ -79,10 +53,6 @@ except Exception as e:
     characters = []
 
 
-
-# ==========================
-# Пользователи
-# ==========================
 
 users = {}
 
@@ -121,24 +91,14 @@ if os.path.exists(USERS_FILE):
                 BACKUP_FILE
             )
 
-            logging.info(
-                "Создан users_backup.json"
-            )
-
-
         except Exception as backup_error:
 
             logging.error(
-                f"Ошибка создания резервной копии: {backup_error}"
+                f"Ошибка создания backup: {backup_error}"
             )
 
 
         users = {}
-
-
-else:
-
-    users = {}
 
 
 
@@ -159,18 +119,13 @@ def save_users():
                 indent=4
             )
 
-
     except Exception as e:
 
         logging.error(
-            f"Ошибка сохранения users.json: {e}"
+            f"Ошибка сохранения: {e}"
         )
 
 
-
-# ==========================
-# Пользователь
-# ==========================
 
 def get_user(user_id):
 
@@ -190,10 +145,6 @@ def get_user(user_id):
 
 
 
-# ==========================
-# Персонаж
-# ==========================
-
 def get_character(user_id):
 
     user = get_user(user_id)
@@ -210,31 +161,63 @@ def get_character(user_id):
     ]
 
 
-    if not available:
+    total = len(characters)
 
-        return None
+    owned = len(collected)
+
+
+    if available:
+
+        progress = owned / total
+
+
+        if progress < 0.5:
+
+            new_chance = 90
+
+        elif progress < 0.8:
+
+            new_chance = 70
+
+        elif progress < 1:
+
+            new_chance = 40
+
+        else:
+
+            new_chance = 0
+
+
+        roll = random.randint(
+            1,
+            100
+        )
+
+
+        if roll <= new_chance:
+
+            character = random.choice(
+                available
+            )
+
+            collected.append(
+                character["name"]
+            )
+
+            save_users()
+
+            return character
+
 
 
     character = random.choice(
-        available
+        characters
     )
-
-
-    collected.append(
-        character["name"]
-    )
-
-
-    save_users()
 
 
     return character
 
 
-
-# ==========================
-# Отправка персонажа
-# ==========================
 
 def send_character(message):
 
@@ -243,26 +226,9 @@ def send_character(message):
     )
 
 
-    if character is None:
-
-        bot.send_message(
-
-            message.chat.id,
-
-            "🍯 Ты уже собрал всех персонажей!"
-
-        )
-
-        return
-
-
-
     image_path = os.path.join(
-
         os.getcwd(),
-
         character["image"]
-
     )
 
 
@@ -272,14 +238,7 @@ def send_character(message):
 
         f"<i>{character['description']}</i>\n\n"
 
-        "📖 Новый персонаж добавлен в коллекцию!"
-
-    )
-
-
-    logging.info(
-
-        f"{message.from_user.id} получил {character['name']}"
+        "📖 Персонаж получен!"
 
     )
 
@@ -287,14 +246,12 @@ def send_character(message):
     if not os.path.exists(image_path):
 
         bot.send_message(
-
             message.chat.id,
-
             "⚠️ Картинка персонажа не найдена."
-
         )
 
         return
+
 
 
     try:
@@ -324,10 +281,6 @@ def send_character(message):
         )
 
 
-
-# ==========================
-# START
-# ==========================
 
 @bot.message_handler(
     commands=["start"]
@@ -362,10 +315,6 @@ def start(message):
 
 
 
-# ==========================
-# Кнопка
-# ==========================
-
 @bot.message_handler(
 
     func=lambda message:
@@ -380,10 +329,6 @@ def button_character(message):
 
 
 
-# ==========================
-# HONEY
-# ==========================
-
 @bot.message_handler(
     commands=["honey"]
 )
@@ -393,10 +338,6 @@ def honey(message):
     send_character(message)
 
 
-
-# ==========================
-# COLLECTION
-# ==========================
 
 @bot.message_handler(
     commands=["collection"]
@@ -430,7 +371,6 @@ def collection(message):
 
             text += f"{i}. {name}\n"
 
-
     else:
 
         text += "Коллекция пуста."
@@ -447,10 +387,6 @@ def collection(message):
     )
 
 
-
-# ==========================
-# STATS
-# ==========================
 
 @bot.message_handler(
     commands=["stats"]
@@ -477,10 +413,6 @@ def stats(message):
 
 
 
-# ==========================
-# HELP
-# ==========================
-
 @bot.message_handler(
     commands=["help"]
 )
@@ -503,36 +435,6 @@ def help_command(message):
     )
 
 
-
-# ==========================
-# UNKNOWN
-# ==========================
-
-@bot.message_handler(
-
-    func=lambda message:
-
-    message.text is not None
-
-    and message.text.startswith("/")
-
-)
-
-def unknown_command(message):
-
-    bot.send_message(
-
-        message.chat.id,
-
-        "❌ Такой команды нет.\nИспользуйте /help."
-
-    )
-
-
-
-# ==========================
-# Flask запуск
-# ==========================
 
 def run_flask():
 
@@ -570,18 +472,9 @@ logging.info(
 
 
 
-# ==========================
-# Polling
-# ==========================
-
 while True:
 
     try:
-
-        logging.info(
-            "Запуск polling..."
-        )
-
 
         bot.infinity_polling(
 
@@ -597,9 +490,7 @@ while True:
     except Exception as e:
 
         logging.error(
-
             f"Polling ошибка: {e}"
-
         )
 
         time.sleep(10)
