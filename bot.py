@@ -7,31 +7,39 @@ import time
 import logging
 from flask import Flask
 
-TOKEN = "8969226485:AAGB_q2f1kOG3kENC2yWwb3GgM31boxqL44"
+
+TOKEN = "8969226485:AAHCI6TcrCjEj3XgaC-BfndGMMVjCI2nUhc"
+
 
 bot = telebot.TeleBot(TOKEN)
 
+
 app = Flask(__name__)
+
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-# ==========================================
+
+CHARACTERS_FILE = "characters.json"
+USERS_FILE = "users.json"
+
+
+# ==========================
 # Flask
-# ==========================================
+# ==========================
 
 @app.route("/")
 def home():
     return "HoneyRealmBot is running!"
 
 
-# ==========================================
-# Загрузка персонажей
-# ==========================================
 
-CHARACTERS_FILE = "characters.json"
+# ==========================
+# Загрузка персонажей
+# ==========================
 
 with open(
     CHARACTERS_FILE,
@@ -42,164 +50,358 @@ with open(
     characters = json.load(file)
 
 
-# ==========================================
-# Запоминание последних персонажей
-# ==========================================
 
-last_character = {}
+# ==========================
+# Пользователи
+# ==========================
 
-HISTORY_LIMIT = 10
+if os.path.exists(USERS_FILE):
 
-history = {}
+    with open(
+        USERS_FILE,
+        "r",
+        encoding="utf-8"
+    ) as file:
+
+        users = json.load(file)
+
+else:
+
+    users = {}
 
 
-# ==========================================
-# Получить случайного персонажа
-# ==========================================
 
-def get_random_character(chat_id):
+def save_users():
 
-    if chat_id not in history:
-        history[chat_id] = []
+    with open(
+        USERS_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+            users,
+            file,
+            ensure_ascii=False,
+            indent=4
+        )
+
+
+
+# ==========================
+# Получение пользователя
+# ==========================
+
+def get_user(user_id):
+
+    user_id = str(user_id)
+
+    if user_id not in users:
+
+        users[user_id] = {
+
+            "collection": []
+
+        }
+
+        save_users()
+
+
+    return users[user_id]
+
+
+
+# ==========================
+# Выбор персонажа
+# ==========================
+
+def get_character(user_id):
+
+    user = get_user(user_id)
+
+
+    collected = user["collection"]
+
 
     available = [
+
         c for c in characters
-        if c["name"] not in history[chat_id]
+
+        if c["name"] not in collected
+
     ]
+
 
     if len(available) == 0:
 
-        history[chat_id] = []
+        available = characters
 
-        available = characters.copy()
 
-    character = random.choice(available)
 
-    history[chat_id].append(
-        character["name"]
+    character = random.choice(
+        available
     )
 
-    if len(history[chat_id]) > HISTORY_LIMIT:
-        history[chat_id].pop(0)
+
+    if character["name"] not in collected:
+
+        collected.append(
+            character["name"]
+        )
+
+        save_users()
+
 
     return character
-
-
-# ==========================================
+    ```python
+# ==========================
 # Отправка персонажа
-# ==========================================
+# ==========================
 
-def send_character(chat_id):
+def send_character(message):
 
-    character = get_random_character(chat_id)
+    user_id = message.from_user.id
+
+    character = get_character(
+        user_id
+    )
+
 
     image_name = character["image"]
+
 
     image_path = os.path.join(
         os.getcwd(),
         image_name
     )
 
+
     caption = (
+
         f"🍯 <b>{character['name']}</b>\n\n"
-        f"<i>{character['description']}</i>"
+
+        f"<i>{character['description']}</i>\n\n"
+
+        f"📖 Новый персонаж добавлен в коллекцию!"
+
     )
 
+
     logging.info(
-        f"Выбран персонаж: {character['name']}"
+
+        f"{message.from_user.id} получил {character['name']}"
+
     )
+
 
     if not os.path.exists(image_path):
 
-        logging.error(
-            f"Файл отсутствует: {image_name}"
-        )
-
         bot.send_message(
-            chat_id,
-            "⚠️ Изображение персонажа не найдено."
+
+            message.chat.id,
+
+            "⚠️ Картинка персонажа не найдена."
+
         )
 
         return
 
-    for attempt in range(3):
 
-        try:
 
-            with open(
-                image_path,
-                "rb"
-            ) as photo:
+    try:
 
-                bot.send_photo(
-                    chat_id,
-                    photo,
-                    caption=caption,
-                    parse_mode="HTML",
-                    timeout=60
-                )
+        with open(
 
-            logging.info(
-                "Фото успешно отправлено."
+            image_path,
+
+            "rb"
+
+        ) as photo:
+
+
+            bot.send_photo(
+
+                message.chat.id,
+
+                photo,
+
+                caption=caption,
+
+                parse_mode="HTML"
+
             )
 
-            return
 
-        except Exception as e:
+    except Exception as e:
 
-            logging.error(
-                f"Ошибка отправки ({attempt+1}): {e}"
-            )
 
-            time.sleep(2)
+        logging.error(
 
-    bot.send_message(
-        chat_id,
-        "⚠️ Не удалось отправить персонажа."
+            f"Ошибка отправки фото: {e}"
+
+        )
+
+
+        bot.send_message(
+
+            message.chat.id,
+
+            "⚠️ Ошибка отправки персонажа."
+
+        )
+
+
+
+# ==========================
+# Коллекция
+# ==========================
+
+@bot.message_handler(
+    commands=["collection"]
+)
+def collection(message):
+
+    user = get_user(
+        message.from_user.id
     )
 
 
-# ==========================================
-# /start
-# ==========================================
+    collected = user["collection"]
 
-@bot.message_handler(commands=["start"])
+
+    total = len(characters)
+
+    opened = len(collected)
+
+
+    text = (
+
+        "🍯 <b>Твоя коллекция HoneyRealm</b>\n\n"
+
+        f"Открыто: {opened}/{total}\n\n"
+
+    )
+
+
+    if opened == 0:
+
+        text += "Коллекция пока пуста."
+
+
+    else:
+
+        for index, name in enumerate(
+            collected,
+            start=1
+        ):
+
+            text += (
+
+                f"{index}. {name}\n"
+
+            )
+
+
+    bot.send_message(
+
+        message.chat.id,
+
+        text,
+
+        parse_mode="HTML"
+
+    )
+
+
+
+# ==========================
+# Статистика
+# ==========================
+
+@bot.message_handler(
+    commands=["stats"]
+)
+def stats(message):
+
+    user = get_user(
+        message.from_user.id
+    )
+
+
+    count = len(
+        user["collection"]
+    )
+
+
+    bot.send_message(
+
+        message.chat.id,
+
+        "🍯 <b>Статистика</b>\n\n"
+        f"Получено персонажей: {count}",
+
+        parse_mode="HTML"
+
+    )
+
+
+
+# ==========================
+# /start
+# ==========================
+
+@bot.message_handler(
+    commands=["start"]
+)
 def start(message):
 
     markup = telebot.types.ReplyKeyboardMarkup(
+
         resize_keyboard=True
+
     )
+
 
     markup.add(
+
         telebot.types.KeyboardButton(
+
             "🍯 Узнать, кто я"
+
         )
+
     )
+
 
     bot.send_message(
+
         message.chat.id,
-        "Добро пожаловать в HoneyRealm 🍯\n\n"
-        "Нажмите кнопку ниже, чтобы узнать своего персонажа.",
+
+        "🍯 Добро пожаловать в HoneyRealm!\n\n"
+        "Получай персонажей и собирай коллекцию.",
+
         reply_markup=markup
+
     )
-
-
-# ==========================================
-# Кнопка
-# ==========================================
+# ==========================
+# Кнопка получения персонажа
+# ==========================
 
 @bot.message_handler(
     func=lambda message:
     message.text == "🍯 Узнать, кто я"
 )
-def button_handler(message):
+def button_character(message):
 
     send_character(
-        message.chat.id
+        message
     )
-# ==========================================
+
+
+
+# ==========================
 # Команда /honey
-# ==========================================
+# ==========================
 
 @bot.message_handler(
     commands=["honey"]
@@ -207,13 +409,14 @@ def button_handler(message):
 def honey(message):
 
     send_character(
-        message.chat.id
+        message
     )
 
 
-# ==========================================
-# Команда /help
-# ==========================================
+
+# ==========================
+# Помощь
+# ==========================
 
 @bot.message_handler(
     commands=["help"]
@@ -226,10 +429,11 @@ def help_command(message):
 
         "🍯 <b>HoneyRealmBot</b>\n\n"
 
-        "Доступные команды:\n\n"
+        "Команды:\n\n"
 
-        "/start — открыть меню\n"
-        "/honey — получить случайного персонажа\n"
+        "/honey — получить персонажа\n"
+        "/collection — открыть коллекцию\n"
+        "/stats — статистика\n"
         "/help — помощь",
 
         parse_mode="HTML"
@@ -237,72 +441,10 @@ def help_command(message):
     )
 
 
-# ==========================================
-# Inline режим
-# ==========================================
 
-@bot.inline_handler(
-    func=lambda query: True
-)
-def inline_help(query):
-
-    result = telebot.types.InlineQueryResultArticle(
-
-        id="honeyrealm",
-
-        title="🍯 HoneyRealmBot",
-
-        description="Получить персонажа HoneyRealm",
-
-        input_message_content=
-        telebot.types.InputTextMessageContent(
-
-            message_text=
-
-            "🍯 <b>HoneyRealmBot</b>\n\n"
-
-            "Чтобы получить своего персонажа:\n\n"
-
-            "• откройте личный чат с ботом\n"
-            "• нажмите кнопку «🍯 Узнать, кто я»\n\n"
-
-            "или\n\n"
-
-            "используйте команду\n"
-            "/honey",
-
-            parse_mode="HTML"
-
-        )
-
-    )
-
-    try:
-
-        bot.answer_inline_query(
-
-            query.id,
-
-            [result],
-
-            cache_time=0,
-
-            is_personal=True
-
-        )
-
-    except Exception as e:
-
-        logging.error(
-
-            f"Inline error: {e}"
-
-        )
-
-
-# ==========================================
+# ==========================
 # Неизвестные команды
-# ==========================================
+# ==========================
 
 @bot.message_handler(
     func=lambda message:
@@ -315,15 +457,16 @@ def unknown_command(message):
 
         message.chat.id,
 
-        "❌ Такой команды не существует.\n\n"
+        "❌ Такой команды нет.\n"
         "Используйте /help."
 
     )
 
 
-# ==========================================
-# Flask
-# ==========================================
+
+# ==========================
+# Flask запуск
+# ==========================
 
 def run_flask():
 
@@ -339,6 +482,7 @@ def run_flask():
 
     )
 
+
     app.run(
 
         host="0.0.0.0",
@@ -348,9 +492,6 @@ def run_flask():
     )
 
 
-# ==========================================
-# Запуск Flask
-# ==========================================
 
 threading.Thread(
 
@@ -361,16 +502,18 @@ threading.Thread(
 ).start()
 
 
+
 logging.info(
 
-    "HoneyRealmBot запущен."
+    "HoneyRealmBot запущен"
 
 )
 
 
-# ==========================================
-# Polling
-# ==========================================
+
+# ==========================
+# Telegram polling
+# ==========================
 
 while True:
 
@@ -382,6 +525,7 @@ while True:
 
         )
 
+
         bot.infinity_polling(
 
             skip_pending=True,
@@ -392,12 +536,14 @@ while True:
 
         )
 
+
     except Exception as e:
 
         logging.error(
 
-            f"Polling crashed: {e}"
+            f"Polling ошибка: {e}"
 
         )
+
 
         time.sleep(10)
