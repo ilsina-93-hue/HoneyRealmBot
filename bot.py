@@ -33,6 +33,7 @@ def home():
     return "HoneyRealmBot is running!"
 
 
+
 try:
     with open(
         CHARACTERS_FILE,
@@ -42,12 +43,16 @@ try:
         characters = json.load(file)
 
 except Exception as e:
-    logging.error(f"Ошибка загрузки персонажей: {e}")
+    logging.error(
+        f"Ошибка загрузки персонажей: {e}"
+    )
     characters = []
+
 
 
 def db_connect():
     return sqlite3.connect(DB_FILE)
+
 
 
 def init_db():
@@ -69,7 +74,9 @@ def init_db():
     conn.close()
 
 
+
 init_db()
+
 
 
 def get_collection(user_id):
@@ -90,6 +97,7 @@ def get_collection(user_id):
     conn.close()
 
     return result
+
 
 
 def add_character(user_id, character):
@@ -113,6 +121,7 @@ def add_character(user_id, character):
     conn.close()
 
 
+
 def get_character(user_id):
 
     collected = get_collection(user_id)
@@ -125,23 +134,30 @@ def get_character(user_id):
     total = len(characters)
     owned = len(collected)
 
+
     if available:
 
         progress = owned / total if total else 1
 
+
         if progress < 0.5:
-            chance = 90
+            chance = 95
+
         elif progress < 0.8:
-            chance = 70
+            chance = 75
+
         elif progress < 0.95:
-            chance = 40
+            chance = 50
+
         else:
-            chance = 20
+            chance = 25
 
 
         if random.randint(1, 100) <= chance:
 
-            character = random.choice(available)
+            character = random.choice(
+                available
+            )
 
             add_character(
                 user_id,
@@ -151,7 +167,13 @@ def get_character(user_id):
             return character
 
 
+        else:
+
+            return random.choice(characters)
+
+
     return random.choice(characters)
+
 
 
 def send_character(message):
@@ -160,15 +182,21 @@ def send_character(message):
         message.from_user.id
     )
 
+
     image_path = os.path.join(
         os.getcwd(),
         character["image"]
     )
 
+
     caption = (
+
         f"🍯 <b>{character['name']}</b>\n\n"
+
         f"<i>{character['description']}</i>\n\n"
+
         "📖 Персонаж получен!"
+
     )
 
 
@@ -180,6 +208,7 @@ def send_character(message):
         )
 
         return
+
 
 
     try:
@@ -204,12 +233,17 @@ def send_character(message):
         )
 
 
-@bot.message_handler(commands=["start"])
+
+@bot.message_handler(
+    commands=["start"]
+)
+
 def start(message):
 
     markup = telebot.types.ReplyKeyboardMarkup(
         resize_keyboard=True
     )
+
 
     markup.add(
         telebot.types.KeyboardButton(
@@ -226,31 +260,45 @@ def start(message):
     )
 
 
+
 @bot.message_handler(
     func=lambda message:
     message.text == "🍯 Узнать, кто я"
 )
+
 def button_character(message):
 
     send_character(message)
 
 
-@bot.message_handler(commands=["honey"])
+
+@bot.message_handler(
+    commands=["honey"]
+)
+
 def honey(message):
 
     send_character(message)
 
 
-@bot.message_handler(commands=["collection"])
+
+@bot.message_handler(
+    commands=["collection"]
+)
+
 def collection(message):
 
     collected = get_collection(
         message.from_user.id
     )
 
+
     text = (
+
         "🍯 <b>Твоя коллекция HoneyRealm</b>\n\n"
+
         f"Открыто: {len(collected)}/{len(characters)}\n\n"
+
     )
 
 
@@ -275,7 +323,11 @@ def collection(message):
     )
 
 
-@bot.message_handler(commands=["stats"])
+
+@bot.message_handler(
+    commands=["stats"]
+)
+
 def stats(message):
 
     count = len(
@@ -293,7 +345,11 @@ def stats(message):
     )
 
 
-@bot.message_handler(commands=["help"])
+
+@bot.message_handler(
+    commands=["help"]
+)
+
 def help_command(message):
 
     bot.send_message(
@@ -307,6 +363,7 @@ def help_command(message):
     )
 
 
+
 def run_flask():
 
     port = int(
@@ -316,10 +373,12 @@ def run_flask():
         )
     )
 
+
     app.run(
         host="0.0.0.0",
         port=port
     )
+
 
 
 threading.Thread(
@@ -328,9 +387,11 @@ threading.Thread(
 ).start()
 
 
+
 logging.info(
     "HoneyRealmBot запущен"
 )
+
 
 
 while True:
@@ -342,6 +403,7 @@ while True:
             timeout=30,
             long_polling_timeout=30
         )
+
 
     except Exception as e:
 
