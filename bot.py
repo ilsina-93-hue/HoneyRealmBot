@@ -197,7 +197,6 @@ def button_handler(message):
     send_character(
         message.chat.id
     )
-```
 # ==========================================
 # Команда /honey
 # ==========================================
