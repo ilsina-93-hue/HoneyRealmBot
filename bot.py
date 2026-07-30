@@ -4,13 +4,14 @@ import logging
 import json
 import os
 import random
+import sqlite3
 
 import telebot
 
 from flask import Flask
 
 
-TOKEN = "8969226485:AAFL-Vwi58aU0PlPyvkgpgHGKhBXGj4aDA8"
+TOKEN = "8969226485:AAHC9w8VxifEvIqraHCIcp4jm5ymwPlvDlw"
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -24,9 +25,7 @@ logging.basicConfig(
 
 
 CHARACTERS_FILE = "characters.json"
-USERS_FILE = "users.json"
-BACKUP_FILE = "users_backup.json"
-
+DB_FILE = "users.db"
 
 
 @app.route("/")
@@ -34,6 +33,9 @@ def home():
     return "HoneyRealmBot is running!"
 
 
+# ==========================
+# Персонажи
+# ==========================
 
 try:
     with open(
@@ -41,115 +43,94 @@ try:
         "r",
         encoding="utf-8-sig"
     ) as file:
-
         characters = json.load(file)
 
 except Exception as e:
-
     logging.error(
         f"Ошибка загрузки персонажей: {e}"
     )
-
     characters = []
 
 
+# ==========================
+# SQLite
+# ==========================
 
-users = {}
-
-
-if os.path.exists(USERS_FILE):
-
-    try:
-
-        with open(
-            USERS_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            users = json.load(file)
+def db_connect():
+    return sqlite3.connect(DB_FILE)
 
 
-        if not isinstance(users, dict):
+def init_db():
 
-            raise ValueError(
-                "Неверный формат users.json"
-            )
+    conn = db_connect()
+    cursor = conn.cursor()
 
-
-    except Exception as e:
-
-        logging.error(
-            f"Ошибка загрузки users.json: {e}"
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS collections (
+            user_id TEXT,
+            character TEXT,
+            UNIQUE(user_id, character)
         )
+        """
+    )
+
+    conn.commit()
+    conn.close()
 
 
-        try:
-
-            os.rename(
-                USERS_FILE,
-                BACKUP_FILE
-            )
-
-        except Exception as backup_error:
-
-            logging.error(
-                f"Ошибка создания backup: {backup_error}"
-            )
+init_db()
 
 
-        users = {}
+def get_collection(user_id):
+
+    conn = db_connect()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT character FROM collections WHERE user_id=?",
+        (str(user_id),)
+    )
+
+    result = [
+        row[0]
+        for row in cursor.fetchall()
+    ]
+
+    conn.close()
+
+    return result
 
 
+def add_character(user_id, character):
 
-def save_users():
+    conn = db_connect()
+    cursor = conn.cursor()
 
-    try:
-
-        with open(
-            USERS_FILE,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                users,
-                file,
-                ensure_ascii=False,
-                indent=4
-            )
-
-    except Exception as e:
-
-        logging.error(
-            f"Ошибка сохранения: {e}"
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO collections
+        (user_id, character)
+        VALUES (?, ?)
+        """,
+        (
+            str(user_id),
+            character
         )
+    )
+
+    conn.commit()
+    conn.close()
 
 
 
-def get_user(user_id):
-
-    user_id = str(user_id)
-
-
-    if user_id not in users:
-
-        users[user_id] = {
-            "collection": []
-        }
-
-        save_users()
-
-
-    return users[user_id]
-
-
+# ==========================
+# Получение персонажа
+# ==========================
 
 def get_character(user_id):
 
-    user = get_user(user_id)
-
-    collected = user["collection"]
+    collected = get_collection(user_id)
 
 
     available = [
@@ -162,62 +143,48 @@ def get_character(user_id):
 
 
     total = len(characters)
-
     owned = len(collected)
 
 
     if available:
 
-        progress = owned / total
+        progress = owned / total if total else 1
 
 
         if progress < 0.5:
-
-            new_chance = 90
+            chance = 90
 
         elif progress < 0.8:
-
-            new_chance = 70
+            chance = 70
 
         elif progress < 1:
-
-            new_chance = 40
+            chance = 40
 
         else:
-
-            new_chance = 0
-
-
-        roll = random.randint(
-            1,
-            100
-        )
+            chance = 10
 
 
-        if roll <= new_chance:
+        if random.randint(1,100) <= chance:
 
             character = random.choice(
                 available
             )
 
-            collected.append(
+            add_character(
+                user_id,
                 character["name"]
             )
-
-            save_users()
 
             return character
 
 
-
-    character = random.choice(
-        characters
-    )
+    return random.choice(characters)
 
 
-    return character
 
-
+# ==========================
+# Отправка
+# ==========================
 
 def send_character(message):
 
@@ -253,7 +220,6 @@ def send_character(message):
         return
 
 
-
     try:
 
         with open(
@@ -282,6 +248,10 @@ def send_character(message):
 
 
 
+# ==========================
+# Команды
+# ==========================
+
 @bot.message_handler(
     commands=["start"]
 )
@@ -292,13 +262,10 @@ def start(message):
         resize_keyboard=True
     )
 
-
     markup.add(
-
         telebot.types.KeyboardButton(
             "🍯 Узнать, кто я"
         )
-
     )
 
 
@@ -316,11 +283,8 @@ def start(message):
 
 
 @bot.message_handler(
-
     func=lambda message:
-
     message.text == "🍯 Узнать, кто я"
-
 )
 
 def button_character(message):
@@ -345,12 +309,9 @@ def honey(message):
 
 def collection(message):
 
-    user = get_user(
+    collected = get_collection(
         message.from_user.id
     )
-
-
-    collected = user["collection"]
 
 
     text = (
@@ -370,6 +331,7 @@ def collection(message):
         ):
 
             text += f"{i}. {name}\n"
+
 
     else:
 
@@ -394,8 +356,10 @@ def collection(message):
 
 def stats(message):
 
-    user = get_user(
-        message.from_user.id
+    count = len(
+        get_collection(
+            message.from_user.id
+        )
     )
 
 
@@ -404,8 +368,7 @@ def stats(message):
         message.chat.id,
 
         "🍯 <b>Статистика</b>\n\n"
-
-        f"Получено персонажей: {len(user['collection'])}",
+        f"Получено персонажей: {count}",
 
         parse_mode="HTML"
 
@@ -424,7 +387,6 @@ def help_command(message):
         message.chat.id,
 
         "🍯 <b>HoneyRealmBot</b>\n\n"
-
         "/honey — получить персонажа\n"
         "/collection — коллекция\n"
         "/stats — статистика\n"
@@ -435,6 +397,10 @@ def help_command(message):
     )
 
 
+
+# ==========================
+# Flask
+# ==========================
 
 def run_flask():
 
@@ -457,11 +423,8 @@ def run_flask():
 
 
 threading.Thread(
-
     target=run_flask,
-
     daemon=True
-
 ).start()
 
 
