@@ -14,7 +14,7 @@ from flask import Flask
 # TOKEN
 # ==========================
 
-TOKEN = "8969226485:AAHCI6TcrCjEj3XgaC-BfndGMMVjCI2nUhc"
+TOKEN = "8969226485:AAHAlONzMrgtquxWIUtkq3dlFsC1t3dPSec"
 
 bot = telebot.TeleBot(TOKEN)
 
