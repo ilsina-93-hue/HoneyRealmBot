@@ -42,10 +42,11 @@ logging.basicConfig(
 
 CHARACTERS_FILE = "characters.json"
 USERS_FILE = "users.json"
+BACKUP_FILE = "users_backup.json"
 
 
 # ==========================
-# Главная страница Flask
+# Flask
 # ==========================
 
 @app.route("/")
@@ -55,10 +56,11 @@ def home():
 
 
 # ==========================
-# Загрузка персонажей
+# Персонажи
 # ==========================
 
 try:
+
     with open(
         CHARACTERS_FILE,
         "r",
@@ -66,6 +68,7 @@ try:
     ) as file:
 
         characters = json.load(file)
+
 
 except Exception as e:
 
@@ -81,6 +84,9 @@ except Exception as e:
 # Пользователи
 # ==========================
 
+users = {}
+
+
 if os.path.exists(USERS_FILE):
 
     try:
@@ -93,9 +99,42 @@ if os.path.exists(USERS_FILE):
 
             users = json.load(file)
 
-    except:
+
+        if not isinstance(users, dict):
+
+            raise ValueError(
+                "Неверный формат users.json"
+            )
+
+
+    except Exception as e:
+
+        logging.error(
+            f"Ошибка загрузки users.json: {e}"
+        )
+
+
+        try:
+
+            os.rename(
+                USERS_FILE,
+                BACKUP_FILE
+            )
+
+            logging.info(
+                "Создан users_backup.json"
+            )
+
+
+        except Exception as backup_error:
+
+            logging.error(
+                f"Ошибка создания резервной копии: {backup_error}"
+            )
+
 
         users = {}
+
 
 else:
 
@@ -105,23 +144,32 @@ else:
 
 def save_users():
 
-    with open(
-        USERS_FILE,
-        "w",
-        encoding="utf-8"
-    ) as file:
+    try:
 
-        json.dump(
-            users,
-            file,
-            ensure_ascii=False,
-            indent=4
+        with open(
+            USERS_FILE,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                users,
+                file,
+                ensure_ascii=False,
+                indent=4
+            )
+
+
+    except Exception as e:
+
+        logging.error(
+            f"Ошибка сохранения users.json: {e}"
         )
 
 
 
 # ==========================
-# Получение пользователя
+# Пользователь
 # ==========================
 
 def get_user(user_id):
@@ -143,7 +191,7 @@ def get_user(user_id):
 
 
 # ==========================
-# Получение персонажа
+# Персонаж
 # ==========================
 
 def get_character(user_id):
@@ -162,7 +210,7 @@ def get_character(user_id):
     ]
 
 
-    if len(available) == 0:
+    if not available:
 
         return None
 
@@ -175,6 +223,7 @@ def get_character(user_id):
     collected.append(
         character["name"]
     )
+
 
     save_users()
 
@@ -189,11 +238,8 @@ def get_character(user_id):
 
 def send_character(message):
 
-    user_id = message.from_user.id
-
-
     character = get_character(
-        user_id
+        message.from_user.id
     )
 
 
@@ -211,14 +257,11 @@ def send_character(message):
 
 
 
-    image_name = character["image"]
-
-
     image_path = os.path.join(
 
         os.getcwd(),
 
-        image_name
+        character["image"]
 
     )
 
@@ -236,7 +279,7 @@ def send_character(message):
 
     logging.info(
 
-        f"{user_id} получил {character['name']}"
+        f"{message.from_user.id} получил {character['name']}"
 
     )
 
@@ -254,14 +297,12 @@ def send_character(message):
         return
 
 
-
     try:
 
         with open(
             image_path,
             "rb"
         ) as photo:
-
 
             bot.send_photo(
 
@@ -278,26 +319,14 @@ def send_character(message):
 
     except Exception as e:
 
-
         logging.error(
-
             f"Ошибка отправки фото: {e}"
-
-        )
-
-
-        bot.send_message(
-
-            message.chat.id,
-
-            "⚠️ Ошибка отправки персонажа."
-
         )
 
 
 
 # ==========================
-# Команда /start
+# START
 # ==========================
 
 @bot.message_handler(
@@ -307,20 +336,17 @@ def send_character(message):
 def start(message):
 
     markup = telebot.types.ReplyKeyboardMarkup(
-
         resize_keyboard=True
-
     )
 
 
-    button = telebot.types.KeyboardButton(
+    markup.add(
 
-        "🍯 Узнать, кто я"
+        telebot.types.KeyboardButton(
+            "🍯 Узнать, кто я"
+        )
 
     )
-
-
-    markup.add(button)
 
 
     bot.send_message(
@@ -328,7 +354,6 @@ def start(message):
         message.chat.id,
 
         "🍯 Добро пожаловать в HoneyRealm!\n\n"
-
         "Собирай уникальных персонажей.",
 
         reply_markup=markup
@@ -338,7 +363,7 @@ def start(message):
 
 
 # ==========================
-# Кнопка персонажа
+# Кнопка
 # ==========================
 
 @bot.message_handler(
@@ -356,7 +381,7 @@ def button_character(message):
 
 
 # ==========================
-# /honey
+# HONEY
 # ==========================
 
 @bot.message_handler(
@@ -370,7 +395,7 @@ def honey(message):
 
 
 # ==========================
-# Коллекция
+# COLLECTION
 # ==========================
 
 @bot.message_handler(
@@ -380,9 +405,7 @@ def honey(message):
 def collection(message):
 
     user = get_user(
-
         message.from_user.id
-
     )
 
 
@@ -398,11 +421,7 @@ def collection(message):
     )
 
 
-    if len(collected) == 0:
-
-        text += "Коллекция пуста."
-
-    else:
+    if collected:
 
         for i, name in enumerate(
             collected,
@@ -411,6 +430,10 @@ def collection(message):
 
             text += f"{i}. {name}\n"
 
+
+    else:
+
+        text += "Коллекция пуста."
 
 
     bot.send_message(
@@ -426,7 +449,7 @@ def collection(message):
 
 
 # ==========================
-# Статистика
+# STATS
 # ==========================
 
 @bot.message_handler(
@@ -436,9 +459,7 @@ def collection(message):
 def stats(message):
 
     user = get_user(
-
         message.from_user.id
-
     )
 
 
@@ -457,7 +478,7 @@ def stats(message):
 
 
 # ==========================
-# Help
+# HELP
 # ==========================
 
 @bot.message_handler(
@@ -473,11 +494,8 @@ def help_command(message):
         "🍯 <b>HoneyRealmBot</b>\n\n"
 
         "/honey — получить персонажа\n"
-
         "/collection — коллекция\n"
-
         "/stats — статистика\n"
-
         "/help — помощь",
 
         parse_mode="HTML"
@@ -487,7 +505,7 @@ def help_command(message):
 
 
 # ==========================
-# Неизвестные команды
+# UNKNOWN
 # ==========================
 
 @bot.message_handler(
@@ -519,15 +537,10 @@ def unknown_command(message):
 def run_flask():
 
     port = int(
-
         os.environ.get(
-
             "PORT",
-
             10000
-
         )
-
     )
 
 
@@ -551,15 +564,15 @@ threading.Thread(
 
 
 
-# ==========================
-# Telegram polling
-# ==========================
-
 logging.info(
     "HoneyRealmBot запущен"
 )
 
 
+
+# ==========================
+# Polling
+# ==========================
 
 while True:
 
