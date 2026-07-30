@@ -7,7 +7,7 @@ import time
 import logging
 from flask import Flask
 
-TOKEN = "8969226485:AAE7r92E1iz0hRn0zK9pRURTqkwyPgzeBeo"
+TOKEN = "8969226485:AAGB_q2f1kOG3kENC2yWwb3GgM31boxqL44"
 
 bot = telebot.TeleBot(TOKEN)
 
